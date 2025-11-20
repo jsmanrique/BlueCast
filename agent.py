@@ -1,3 +1,11 @@
+# SPDX-FileCopyrightText: © 2025 J. Manrique Lopez de la Fuente <jsmanrique@gmail.com>
+# SPDX-License-Identifier: MIT
+
+"""
+agent.py: Agentic architecture for Surf Forecast Application
+"""
+
+
 import json
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.runners import Runner
