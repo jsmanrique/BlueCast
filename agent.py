@@ -7,10 +7,10 @@ agent.py: Agentic architecture for Surf Forecast Application
 
 
 import json
-from google.adk.agents import LlmAgent, SequentialAgent
+from google.adk.agents import Agent, LlmAgent, SequentialAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import AgentTool
+from google.adk.tools import AgentTool, FunctionTool
 from google.genai import types
 
 from geopy.geocoders import Nominatim
@@ -34,6 +34,54 @@ retry_config = types.HttpRetryOptions(
 # =============================================================================
 # Tools
 # =============================================================================
+
+def check_preferences_complete(tool_context: ToolContext) -> dict:
+
+    state = tool_context.state
+
+    required = {
+        'wave_height': state.get('wave_height'),
+        'wave_type': state.get('wave_type'),
+        'experience_level': state.get('experience_level')
+    }
+
+    missing = [key for key, value in required.items() if value is None]
+    
+    return {
+        'complete': len(missing) == 0,
+        'missing': missing,
+        'collected': {k: v for k, v in required.items() if v is not None}
+    }
+
+def save_wave_height(height: str, tool_context) -> dict:
+    state = tool_context.state
+    state['wave_height'] = height
+    
+    return {
+        'action': 'save_wave_height',
+        'value': height,
+        'message': f'Saved wave height: {height}'
+    }
+
+def save_wave_type(wave_type: str, tool_context) -> dict:
+    state = tool_context.state
+    state['wave_type'] = wave_type
+    
+    return {
+        'action': 'save_wave_type',
+        'value': wave_type,
+        'message': f'Saved wave type: {wave_type}'
+    }
+
+def save_experience_level(level: str, tool_context) -> dict:
+    state = tool_context.state
+    state['experience_level'] = level
+    
+    return {
+        'action': 'save_experience_level',
+        'value': level,
+        'message': f'Saved level of experiencie: {level}'
+    }
 
 def get_coordinates_tool(user_location: str) -> str:
     from geopy.geocoders import Nominatim
@@ -79,6 +127,56 @@ def get_marine_forecast_tool(latitude: float, longitude: float) -> str:
     data = response.json()
 
     return json.dumps(data, indent=2)
+
+# =============================================================================
+# AGENT: PreferencesAgent - Get user surf preferences
+# =============================================================================
+preferences_agent = Agent(
+    name="PreferencesCollectorAgent",
+    model=MODEL,
+    description="Collect user surf preferences such as wave height, wave type, and experience level.",
+    instruction="""
+You are a surf expert in charge of learning the user’s preferences.
+
+Your ONLY task is to collect this information naturally and in a friendly way:
+
+**REQUIRED** (without this we can’t search):
+
+* Preferred wave height (1–2m, 2–3m, 3–4m, etc.)
+* Type of wave (beach break, reef break, point break)
+* Experience level (beginner, intermediate, advanced)
+
+**OPTIONAL** (improves recommendations):
+
+* Wind preference (offshore, onshore, side)
+* Swell direction
+
+**Current preference status:**
+
+* Wave height: {wave_height}
+* Wave type: {wave_type}
+* Experience level: {experience_level}
+* Wind: {wind_preference}
+
+**IMPORTANT:**
+
+* Keep the conversation natural, DO NOT make it sound like an interrogation
+* Use the tools to SAVE each preference when the user mentions it
+* After saving each preference, check if all are complete
+* When preferences are complete, let the user know that we can start searching
+* DO NOT search for conditions yourself, only collect preferences
+
+**Example conversation:**
+User: “I like waves around 1–2 meters.”
+You: [save with save_wave_height] “Perfect! Waves of 1–2m noted. What kind of waves do you prefer — beach break, reef break, or point break?”
+""",
+    tools=[
+        FunctionTool(save_wave_height),
+        FunctionTool(save_wave_type),
+        FunctionTool(save_experience_level),
+        FunctionTool(check_preferences_complete),
+    ],
+)
 
 # =============================================================================
 # AGENT 1: GeocodingAgent - Get location coordinates
