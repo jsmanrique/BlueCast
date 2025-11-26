@@ -13,6 +13,8 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.tools import AgentTool
 from google.genai import types
 
+from geopy.geocoders import Nominatim
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -33,27 +35,36 @@ retry_config = types.HttpRetryOptions(
 # Tools
 # =============================================================================
 
-def get_coordinates_tool(location: str) -> str:
-    import requests
+def get_coordinates_tool(user_location: str) -> str:
+    from geopy.geocoders import Nominatim
 
-    url = "https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": location, "count": 1, "language": "es", "format": "json"}
+    geolocator = Nominatim(user_agent="BlueCastApp")
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    location = geolocator.geocode(user_location)
 
-    if "results" in data and len(data["results"]) > 0:
-        result = data["results"][0]
-        lat = result['latitude']
-        lon = result['longitude']
-        nombre = result['name']
-        return f"latitud: {lat}, longitud: {lon}, lugar: {nombre}"
-    else:
-        return "No se encontraron coordenadas para este lugar"
+    return f"latitude: {location.latitude}, longitude: {location.longitude}, place: {location.address}"
+
+# def get_coordinates_tool(location: str) -> str:
+#     import requests
+
+#     url = "https://geocoding-api.open-meteo.com/v1/search"
+#     params = {"name": location, "count": 1, "language": "es", "format": "json"}
+
+#     response = requests.get(url, params=params)
+#     data = response.json()
+
+#     if "results" in data and len(data["results"]) > 0:
+#         result = data["results"][0]
+#         lat = result['latitude']
+#         lon = result['longitude']
+#         name = result['name']
+#         return f"latitude: {lat}, longitude: {lon}, place: {name}"
+#     else:
+#         return "Error: Location not found"
 
 def get_marine_forecast_tool(latitude: float, longitude: float) -> str:
     import requests
-    from datetime import datetime, timedelta
+    #from datetime import datetime, timedelta
 
     url = "https://marine-api.open-meteo.com/v1/marine"
 
