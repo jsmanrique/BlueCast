@@ -11,7 +11,7 @@ __author__      = "J. Manrique Lopez de la Fuente"
 __copyright__   = "2025. J. Manrique Lopez de la Fuente"
 __license__     = "MIT"
 
-from google.adk.agents import Agent, LlmAgent, SequentialAgent, LoopAgent
+from google.adk.agents import Agent, LlmAgent, SequentialAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool
