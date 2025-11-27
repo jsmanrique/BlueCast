@@ -1,4 +1,4 @@
-# BlueCast
+# ![BlueCast](bluecast.png)
 
 Simple agentic AI-based service to get surf swell forecasts using Google ADK (Agent Development Kit).
 
