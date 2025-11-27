@@ -8,7 +8,7 @@ BlueCast is an intelligent surf forecasting application that uses a multi-agent 
 
 ## Architecture
 
-BlueCast implements a **sequential agent pipeline** consisting of four specialized agents that work together to deliver comprehensive surf forecasts:
+BlueCast implements a **sequential pipeline** consisting of four specialized agents that work together to deliver comprehensive surf forecasts:
 
 ```
 User Query → PreferencesCollectorAgent → GeocodingAgent → MarineForecastAgent → SurfCoachAgent → Final Advice
@@ -22,7 +22,6 @@ User Query → PreferencesCollectorAgent → GeocodingAgent → MarineForecastAg
 - **Model:** gemini-2.5-flash-lite
 - **Tools:**
   - `save_wave_height(height: str)`: Saves preferred wave height (1-2m, 2-3m, 3-4m, etc.)
-  - `save_wave_type(wave_type: str)`: Saves preferred wave type (beach break, reef break, point break)
   - `save_experience_level(level: str)`: Saves user experience level (beginner, intermediate, advanced)
   - `check_preferences_complete()`: Checks if all required preferences are collected
 - **Process:** 
@@ -120,46 +119,6 @@ python agent.py
 ```
 
 This will start an interactive session where you can chat with the surf forecasting agent.
-
-**Example interaction:**
-```
-Hello there! Where do you want to go surfing? (Type exit to quit): San Sebastián
-Agent: [Provides detailed surf forecast for San Sebastián]
-```
-
-The agent will:
-1. First collect your surf preferences (wave height, wave type, experience level)
-2. Find the coordinates of your location
-3. Retrieve the marine forecast
-4. Provide personalized surf advice based on your preferences and the conditions
-
-## Usage Example
-
-The conversation flow with BlueCast:
-
-1. **Preference Collection:**
-```
-BlueCast: Hello there! Where do you want to go surfing? (Type exit to quit): San Sebastián
-BlueCast: Perfect! I'll help you find the best spots in San Sebastián. First, let me learn about your preferences to give you the best recommendations.
-
-What preferred wave height do you like? (1-2m, 2-3m, 3-4m, etc.)
-User: 1-2m
-BlueCast: Great! Waves of 1-2m noted. What kind of waves do you prefer - beach break, reef break, or point break?
-User: beach break
-BlueCast: Beach break it is! What's your experience level? (beginner, intermediate, advanced)
-User: intermediate
-BlueCast: Perfect! Now I have all the information I need. Let me check the surf conditions for you in San Sebastián...
-```
-
-2. **Forecast and Advice:**
-```
-BlueCast: [Provides detailed surf forecast for San Sebastián with personalized recommendations based on user preferences]
-```
-
-You can ask about any coastal location:
-- "Mundaka"
-- "Zarautz"
-- "Hossegor"
 
 ## Features
 

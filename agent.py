@@ -11,7 +11,7 @@ __author__      = "J. Manrique Lopez de la Fuente"
 __copyright__   = "2025. J. Manrique Lopez de la Fuente"
 __license__     = "MIT"
 
-from google.adk.agents import LlmAgent, SequentialAgent
+from google.adk.agents import Agent, LlmAgent, SequentialAgent, LoopAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool
@@ -48,7 +48,6 @@ def check_preferences_complete(tool_context: ToolContext) -> dict:
 
     required = {
         'wave_height': state.get('user:wave_height'),
-        'wave_type': state.get('user:wave_type'),
         'experience_level': state.get('user:experience_level')
     }
 
@@ -68,16 +67,6 @@ def save_wave_height(height: str, tool_context: ToolContext) -> dict:
         'action': 'save_wave_height',
         'value': height,
         'message': f'Saved wave height: {height}'
-    }
-
-def save_wave_type(wave_type: str, tool_context: ToolContext) -> dict:
-    state = tool_context.state
-    state['user:wave_type'] = wave_type
-    
-    return {
-        'action': 'save_wave_type',
-        'value': wave_type,
-        'message': f'Saved wave type: {wave_type}'
     }
 
 def save_experience_level(level: str, tool_context: ToolContext) -> dict:
@@ -137,16 +126,16 @@ preferences_agent = LlmAgent(
         **OPTIONAL** (improves recommendations):
 
         * Swell direction
+        * Wind preference (offshore, onshore, cross-shore)
 
         **Current preference status:**
 
         * Wave height: {wave_height}
-        * Wave type: {wave_type}
         * Experience level: {experience_level}
-        * Wind: {wind_preference}
 
         **IMPORTANT:**
 
+        * Use the same language as the user
         * Keep the conversation natural, DO NOT make it sound like an interrogation
         * Use the tools to SAVE each preference when the user mentions it
         * After saving each preference, check if all are complete
@@ -159,14 +148,13 @@ preferences_agent = LlmAgent(
     """,
     tools=[
         FunctionTool(save_wave_height),
-        FunctionTool(save_wave_type),
         FunctionTool(save_experience_level),
         FunctionTool(check_preferences_complete),
     ],
 )
 
 # =============================================================================
-# AGENT 1: GeocodingAgent - Get location coordinates
+# AGENT: GeocodingAgent - Get location coordinates
 # =============================================================================
 geocoding_agent = LlmAgent(
     name="GeocodingAgent",
@@ -177,18 +165,21 @@ geocoding_agent = LlmAgent(
         MANDATORY PROCESS:
         1. Identify the name of the place in the user's query
         2. Execute the tool to get the coordinates of the place
-        3. Return the coordinates in the specified format 
+        3. Return the coordinates in the specified format
+        4. If the coordinates cannot be found, keep asking the user for clarification
         CORRECT RESPONSE EXAMPLE:
         latitude: 43.3183, longitude: -1.9812, place: San Sebastián
 
-        IMPORTANT: Your answer MUST contain exactly that format with the numbers and the place name.
+        IMPORTANT: 
+        * Use the same language as the user
+        * Your answer MUST contain exactly that format with the numbers and the place name.
     """,
     output_key="coordinates",
     description="Get geographical coordinates using GeoPy.",
 )
 
 # =============================================================================
-# AGENT 2: MarineForecastAgent
+# AGENT: MarineForecastAgent
 # =============================================================================
 marine_forecast_agent = LlmAgent(
     name="MarineForecastAgent",
@@ -205,12 +196,13 @@ marine_forecast_agent = LlmAgent(
 )
 
 # =============================================================================
-# AGENT 3: SurfCoach - Provide surf advice based on forecast
+# AGENT: SurfCoach - Provide surf advice based on forecast
 # =============================================================================
 surf_coach_agent = LlmAgent(
     name="SurfCoachAgent",
     model=MODEL,
-    instruction="""You are a surf coach agent that provides surf advice based on marine weather forecasts.
+    instruction="""You are a surf coach agent that provides surf forecast based on 
+    marine weather forecasts.
         MANDATORY PROCESS:
         1. Analyze the marine weather forecast provided in JSON format.
         2. Provide surf advice based on wave height, wave period, and wave direction.
@@ -236,39 +228,56 @@ surf_coach_agent = LlmAgent(
         * 90° = East
         * 180° = South
         * 270° = West
+        
+        IMPORTANT:
+        * Use the same language as the user
+    """,
+    output_key="surf_forecast",
+    description="Provide surf forecast based on marine weather forecast.",
+)
 
-        Provide your final answer including:
+# =============================================================================
+# Agents pipeline
+# =============================================================================
+forecast_agents_pipeline = SequentialAgent(
+    name="ForecastAgentsPipeline",
+    sub_agents=[geocoding_agent, marine_forecast_agent, surf_coach_agent],
+    description="Pipeline to get surf forecast based on user location.",
+)
 
-        1. Use same language as the user
+# =============================================================================
+# Root agent
+# =============================================================================
+#root_agent = agents_pipeline
+
+root_agent = Agent(
+    name="RootSurfForecastAgent",
+    model=MODEL,
+    sub_agents=[preferences_agent, forecast_agents_pipeline],
+    description="Root agent for surf forecast application.",
+    instruction="""You are a surf coach agent that provides surf advice based on marine weather forecasts
+    user preferences and location.
+    MANDATORY PROCESS:
+    1. First, collect user surf preferences using the PreferencesCollectorAgent. Keep asking until all
+    required preferences are collected (wave height, experience level). Once you have all preferences, 
+    don't ask anymmore about them to the user.
+    2. Next, ask the user for the location to surf.
+    3. Get surf forecast using the ForecastAgentsPipeline.
+    3. Finally, provide surf advice based on the surf forecast and user preferences.
+    and user preferences.
+
+    IMPORTANT: Provide your final answer including:
+
+        1. Use same language as the user. Don't use emojis, or at least gender related ones.
         2. A friendly greeting mentioning the full location
         3. The forecast dates and times
         4. A clear explanation of the wave conditions and their evolution over the day
         5. A recommendation about whether it’s a good day to surf and for what level
         6. A motivating comment
 
-        Use a **warm and enthusiastic tone**, like a surfer friend giving advice.
+    Use a **warm and enthusiastic tone**, like a surfer friend giving advice.
     """,
-    output_key="surf_advice",
-    description="Provide surf advice based on marine weather forecast.",
 )
-
-# =============================================================================
-# Agents pipeline
-# =============================================================================
-agents_pipeline = SequentialAgent(
-    name="AgentsPipeline",
-    sub_agents=[
-        # preferences_agent, 
-        geocoding_agent, 
-        marine_forecast_agent, 
-        surf_coach_agent],
-    description="Pipeline to get surf advice based on user location.",
-)
-
-# =============================================================================
-# Root agent
-# =============================================================================
-root_agent = agents_pipeline
 
 # =============================================================================
 # Runner
@@ -289,15 +298,13 @@ async def main():
         session_id=session_id,
         state={
             "wave_height": None,
-            "wave_type": None,
             "experience_level": None,
-            "wind_preference": None,
             "preferences_complete": False,
         },
     )
 
     while True:
-        user_message = input("Hello there! Where do you want to go surfing? (Type exit to quit): ")
+        user_message = input("User>>: ")
         if user_message.lower() in ["exit", "quit"]:
             break
 
